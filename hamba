@@ -1,6 +1,8 @@
 #!/bin/sh
 set -e
 
+
+
 # Reminder: we will use files in $HOME, hence the use of ~
 # to anchor paths everywhere. HOME can be overridden when
 # running this container.
@@ -63,6 +65,20 @@ config () {
         *:*) BIND="$1" ;;
         *) BIND="*:$1" ;;
     esac
+    
+    maxconn_string=maxconn
+    maxconn=32
+    
+    if [ $MAXCONN -eq 0 ]
+    then
+        maxconn_string=''
+    elif [ $MAXCONN ]
+    then
+        maxconn_string="$maxconn_string $MAXCONN"
+        
+    else 
+        maxconn_string="$maxconn_string $maxconn"
+    fi
 
     # Generate the global section of the config file.
     cat <<EOF
@@ -86,7 +102,7 @@ EOF
     # Now generate all the backend entries.
     shift
     while [ "$1" ]; do
-        echo "  server $1-$2 $1:$2 maxconn 32 check"
+        echo "  server $1-$2 $1:$2 $maxconn_string check"
         shift
         shift
     done
