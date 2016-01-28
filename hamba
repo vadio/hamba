@@ -66,31 +66,59 @@ config () {
         *) BIND="*:$1" ;;
     esac
     
-    maxconn_string=maxconn
     maxconn=32
+    maxconn_string="maxconn $maxconn"
     
     if [ $MAXCONN -eq 0 ]
     then
         maxconn_string=''
     elif [ $MAXCONN ]
     then
-        maxconn_string="$maxconn_string $MAXCONN"
-        
-    else 
-        maxconn_string="$maxconn_string $maxconn"
+        maxconn_string="maxconn $MAXCONN"
+    fi
+
+    timeout_connect='5000ms'
+    timeout_connect_string="timeout connect $timeout_connect"
+
+    if [ $TIMOUT_CONNECT]
+    then
+        timeout_connnect_string="timeout connect $TIMEOUT_CONNECT"    
+    fi
+
+    timeout_client='50000ms'
+    timeout_client_string="timeout client $timeout_client"
+
+    if [ $TIMEOUT_CLIENT ]
+    then
+        timeout_client_string="timeout client $TIMEOUT_CLIENT"
+    fi
+
+    timeout_server='50000ms'
+    timeout_server_string="timeout server $timeout_server"
+
+    if [ $TIMEOUT_SERVER ]
+    then
+        timeout_server_string="timeout server $TIMEOUT_SERVER"
+    fi
+
+    stats_port=1936
+
+    if [ $STATS_PORT ]
+    then
+        stats_port=$STATS_PORT
     fi
 
     # Generate the global section of the config file.
     cat <<EOF
 global
   daemon
-  maxconn 256
-
+  $maxconn_string
+  
 defaults
   mode tcp
-  timeout connect 5000ms
-  timeout client 50000ms
-  timeout server 50000ms
+  ${timeout_connect_string}
+  ${timeout_client_string}
+  ${timeout_server_string}
 
 frontend hamba-in
   bind $BIND
@@ -102,7 +130,7 @@ EOF
     # Now generate all the backend entries.
     shift
     while [ "$1" ]; do
-        echo "  server $1-$2 $1:$2 $maxconn_string check"
+        echo "  server $1-$2 $1:$2 check"
         shift
         shift
     done
@@ -113,6 +141,7 @@ listen admin
   mode http
   bind $ADMIN
   stats enable
+  stats uri /
 EOF
     fi
 }
