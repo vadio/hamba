@@ -26,12 +26,39 @@ esac
 # new HAProxy to terminate the old ones gracefully.
 # Repeat the whole thing forever.
 main () {
-    echo "Starting main loop."
-    while : ; do
-        while ! [ -f ~/haproxy.new ]; do
-            sleep 1
-        done
-        echo "Found haproxy.new."
+   if [ $service_mode = dynamic ]
+   then 
+     echo "Starting main loop."
+     while : ; do
+          while ! [ -f ~/haproxy.new ]; do
+              sleep 1
+          done
+          echo "Found haproxy.new."
+          mv ~/haproxy.new ~/haproxy.chk
+          echo "Configuration validation."
+          if haproxy -f ~/haproxy.chk -c; then
+              echo "Configuration validation PASSED."
+              mv ~/haproxy.chk ~/haproxy.cfg
+          else
+              echo "Configuration validation FAILED."
+              echo "Waiting for new configuration."
+              continue
+          fi
+          echo "Starting new HAProxy instance."
+          if [ -f ~/haproxy.pid ]; then
+              echo "Found haproxy.pid."
+              echo "The following PID(s) will be terminated:"
+              cat ~/haproxy.pid
+              PLEASESTOP="-sf $(cat ~/haproxy.pid)"
+          else
+              PLEASESTOP=
+          fi
+          haproxy -f ~/haproxy.cfg -p ~/haproxy.pid -D $PLEASESTOP
+          echo "Started new HAProxy instance."
+      done
+    elif [ $service_mode = static ]
+    then
+	echo "Found haproxy.new."
         mv ~/haproxy.new ~/haproxy.chk
         echo "Configuration validation."
         if haproxy -f ~/haproxy.chk -c; then
@@ -39,21 +66,12 @@ main () {
             mv ~/haproxy.chk ~/haproxy.cfg
         else
             echo "Configuration validation FAILED."
-            echo "Waiting for new configuration."
-            continue
+            exit
         fi
         echo "Starting new HAProxy instance."
-        if [ -f ~/haproxy.pid ]; then
-            echo "Found haproxy.pid."
-            echo "The following PID(s) will be terminated:"
-            cat ~/haproxy.pid
-            PLEASESTOP="-sf $(cat ~/haproxy.pid)"
-        else
-            PLEASESTOP=
-        fi
-        haproxy -f ~/haproxy.cfg -p ~/haproxy.pid -D $PLEASESTOP
-        echo "Started new HAProxy instance."
-    done
+	      haproxy -f ~/haproxy.cfg -db -p ~/haproxy.pid
+        wait `cat haproxy.pid`
+    fi
 }
 
 # Output a valid HAProxy configuration.
@@ -107,6 +125,13 @@ config () {
     then
         stats_port=$STATS_PORT
     fi
+
+    service_mode=dynamic    
+    if [ $SERVICE_MODE ]
+    then
+        service_mode=$SERVICE_MODE
+    fi
+
 
     # Generate the global section of the config file.
     cat <<EOF
